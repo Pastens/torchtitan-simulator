@@ -63,17 +63,13 @@ class GroupedExperts(Module):
 
         offsets = torch.cumsum(num_tokens_per_expert, dim=0, dtype=torch.int32)
 
-        h = F.silu(
-            torch._grouped_mm(
-                x.bfloat16(), w1.bfloat16().transpose(-2, -1), offs=offsets
-            )
-        )
-        h = h * torch._grouped_mm(
-            x.bfloat16(), w3.bfloat16().transpose(-2, -1), offs=offsets
-        )
-        return torch._grouped_mm(
-            h, w2.bfloat16().transpose(-2, -1), offs=offsets
-        ).type_as(x)
+        w1t = w1.bfloat16().transpose(-2, -1).contiguous()
+        w2t = w2.bfloat16().transpose(-2, -1).contiguous()
+        w3t = w3.bfloat16().transpose(-2, -1).contiguous()
+
+        h = F.silu(torch._grouped_mm(x.bfloat16(), w1t, offs=offsets))
+        h = h * torch._grouped_mm(x.bfloat16(), w3t, offs=offsets)
+        return torch._grouped_mm(h, w2t, offs=offsets).type_as(x)
 
     def forward(
         self,

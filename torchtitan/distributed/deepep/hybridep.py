@@ -28,7 +28,8 @@ from torch._library.opaque_object import (
     register_opaque_type,
 )
 from torch.distributed import ProcessGroup
-from torch.utils._python_dispatch import _disable_current_modes
+
+from torchtitan.tools.logging import logger
 
 _buffer: Any = None  # Global buffer instance
 
@@ -96,7 +97,9 @@ _handle_type = get_opaque_type_name(DispatchHandle)
 torch.library.define(
     "hybridep::dispatch",
     f"(Tensor x, Tensor topk_idx, Tensor topk_weights, int num_experts, "
-    f"bool non_blocking, float? moe_expert_capacity_factor, int? pad_multiple) -> (Tensor, Tensor, Tensor, {_handle_type})",
+    f"int ep_size, str group_name, bool non_blocking, "
+    f"float? moe_expert_capacity_factor, int? pad_multiple) "
+    f"-> (Tensor, Tensor, Tensor, {_handle_type})",
 )
 
 torch.library.define(
@@ -142,6 +145,8 @@ def _dispatch_impl(
     topk_idx: torch.Tensor,
     topk_weights: torch.Tensor,
     num_experts: int,
+    ep_size: int,
+    group_name: str,
     non_blocking: bool = False,
     moe_expert_capacity_factor: float | None = None,
     pad_multiple: int | None = None,
@@ -156,13 +161,17 @@ def _dispatch_impl(
       then reads tokens_per_expert from pinned CPU memory to compute the
       exact num_permuted_tokens on the host.
     """
-    global _buffer
-    if _buffer is None:
-        raise RuntimeError(
-            "HybridEP buffer not initialized. Call dispatch_tokens() first."
-        )
+    num_local_experts = num_experts // ep_size
 
-    num_local_experts = num_experts // _buffer.group_size
+    # pyrefly: ignore [implicit-import, bad-argument-type]
+    group = torch._C._distributed_c10d._resolve_process_group(group_name)
+    get_buffer(
+        group=group,
+        hidden_dim=x.shape[1],
+        num_tokens=x.shape[0],
+        num_local_experts=num_local_experts,
+    )
+
     from deep_ep.hybrid_ep_buffer import indices_to_map
 
     routing_map, probs = indices_to_map(
@@ -176,7 +185,7 @@ def _dispatch_impl(
         ), "moe_expert_capacity_factor is required for non_blocking dispatch"
         num_permuted_tokens = _num_permuted_tokens_for_non_blocking(
             x.shape[0],
-            _buffer.group_size,
+            ep_size,
             num_local_experts,
             topk_idx.shape[1],
             moe_expert_capacity_factor,
@@ -217,16 +226,18 @@ def _dispatch_fake(
     topk_idx: torch.Tensor,
     topk_weights: torch.Tensor,
     num_experts: int,
+    ep_size: int,
+    group_name: str,
     non_blocking: bool = False,
     moe_expert_capacity_factor: float | None = None,
     pad_multiple: int | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, DispatchHandle]:
     """Fake dispatch for torch.compile tracing."""
-    num_local_experts = num_experts // _buffer.group_size
+    num_local_experts = num_experts // ep_size
     if non_blocking:
         out_tokens = _num_permuted_tokens_for_non_blocking(
             x.shape[0],
-            _buffer.group_size,
+            ep_size,
             num_local_experts,
             topk_idx.shape[1],
             moe_expert_capacity_factor,  # pyrefly: ignore [bad-argument-type]
@@ -270,7 +281,7 @@ def _combine_fake(
 def _dispatch_backward(ctx, grad_hidden, grad_scores, grad_tpe, grad_handle):
     """Backward: gather gradients via combine."""
     if grad_hidden is None:
-        return None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None
 
     dispatch_handle = ctx.dispatch_handle
     (topk_idx,) = ctx.saved_tensors
@@ -301,14 +312,14 @@ def _dispatch_backward(ctx, grad_hidden, grad_scores, grad_tpe, grad_handle):
             if grad_probs_dense is not None
             else None
         )
-    # Gradients for: x, topk_idx, topk_weights, num_experts, non_blocking,
-    #                moe_expert_capacity_factor, pad_multiple
-    return grad_x, None, grad_weights, None, None, None, None
+    # Gradients for: x, topk_idx, topk_weights, num_experts, ep_size, group,
+    #                non_blocking, moe_expert_capacity_factor, pad_multiple
+    return grad_x, None, grad_weights, None, None, None, None, None, None
 
 
 def _dispatch_setup_context(ctx, inputs, output):
     """Save context for dispatch backward."""
-    x, topk_idx, _, _, _, _, _ = inputs
+    x, topk_idx, _, _, _, _, _, _, _ = inputs
     _, _, _, dispatch_handle = output
     ctx.dispatch_handle = dispatch_handle
     ctx.input_dtype = x.dtype
@@ -392,12 +403,21 @@ def get_buffer(
     needs_reinit = (
         _buffer is None
         or _buffer.group != group
-        or _buffer.config.hidden_dim < hidden_dim
-        or _buffer.config.max_num_of_tokens_per_rank < max_tokens_per_rank
-        or _buffer.config.num_of_experts_per_rank < num_local_experts
+        or _buffer.configurer.buffer_config.hidden_dim < hidden_dim
+        or _buffer.configurer.buffer_config.max_num_of_tokens_per_rank
+        < max_tokens_per_rank
+        or _buffer.configurer.buffer_config.num_of_experts_per_rank < num_local_experts
     )
 
     if needs_reinit:
+        logger.info(
+            "Initializing HybridEP buffer: hidden_dim=%d, max_tokens_per_rank=%d, "
+            "num_local_experts=%d, ep_size=%d",
+            hidden_dim,
+            max_tokens_per_rank,
+            num_local_experts,
+            group.size(),
+        )
         _buffer = HybridEPBuffer(
             group=group,
             hidden_dim=hidden_dim,
@@ -448,18 +468,8 @@ def dispatch_tokens(
     selected_experts_indices = selected_experts_indices.contiguous()
     top_scores = top_scores.contiguous()
 
-    # Hide buffer setup from SAC's __torch_dispatch__ via _disable_current_modes().
-    # Buffer.__init__ calls all_gather_object() which triggers aten._to_copy
-    # (CUDA→CPU), a MUST_SAVE op in our SAC policy. These are infrastructure
-    # ops, not model compute, and must not enter SAC's FIFO cache.
-    if _buffer is None:
-        with _disable_current_modes():
-            get_buffer(
-                group=group,
-                hidden_dim=hidden_states.shape[1],
-                num_tokens=hidden_states.shape[0],
-                num_local_experts=num_local_experts,
-            )
+    ep_size = group.size()
+    group_name = group.group_name
 
     (
         hidden,
@@ -471,6 +481,8 @@ def dispatch_tokens(
         selected_experts_indices,
         top_scores,
         num_experts,
+        ep_size,
+        group_name,
         non_blocking,
         non_blocking_expert_capacity_factor,
         pad_multiple,

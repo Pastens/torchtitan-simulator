@@ -35,6 +35,60 @@ def build_model_tests_list() -> list[OverrideDefinitions]:
         OverrideDefinitions(
             [
                 [
+                    "--module deepseek_v3 --config deepseek_v3_debugmodel_hybridep",
+                    "--parallelism.data_parallel_shard_degree 4",
+                    "--parallelism.expert_parallel_degree 2",
+                ],
+            ],
+            "DeepSeek V3 FSDP+HybridEP",
+            "deepseek_v3_fsdp+hybridep",
+            ngpu=4,
+        ),
+        OverrideDefinitions(
+            [
+                [
+                    "--module deepseek_v3 --config deepseek_v3_debugmodel_hybridep",
+                    "--parallelism.data_parallel_shard_degree 4",
+                    "--parallelism.expert_parallel_degree 2",
+                    "--compile.enable",
+                    "--compile.components model,loss",
+                ],
+            ],
+            "DeepSeek V3 FSDP+HybridEP+compile",
+            "deepseek_v3_fsdp+hybridep+compile",
+            ngpu=4,
+        ),
+        OverrideDefinitions(
+            [
+                [
+                    "--module deepseek_v3 --config deepseek_v3_debugmodel_hybridep",
+                    "--parallelism.data_parallel_shard_degree 4",
+                    "--parallelism.expert_parallel_degree 2",
+                    "--activation_checkpoint.mode none",
+                ],
+            ],
+            "DeepSeek V3 FSDP+HybridEP+noAC",
+            "deepseek_v3_fsdp+hybridep+no_ac",
+            ngpu=4,
+        ),
+        OverrideDefinitions(
+            [
+                [
+                    "--module deepseek_v3 --config deepseek_v3_debugmodel_hybridep",
+                    "--parallelism.data_parallel_shard_degree 4",
+                    "--parallelism.expert_parallel_degree 2",
+                    "--activation_checkpoint.mode none",
+                    "--compile.enable",
+                    "--compile.components model,loss",
+                ],
+            ],
+            "DeepSeek V3 FSDP+HybridEP+compile+noAC",
+            "deepseek_v3_fsdp+hybridep+compile+no_ac",
+            ngpu=4,
+        ),
+        OverrideDefinitions(
+            [
+                [
                     "--module deepseek_v3 --config deepseek_v3_debugmodel_ep",
                     "--parallelism.pipeline_parallel_degree 2",
                     "--parallelism.pipeline_parallel_schedule Interleaved1F1B",
