@@ -197,11 +197,6 @@ def _build_llama3_tests() -> list[OverrideDefinitions]:
             skip_rocm_test=True,
         ),
         # async_tp test lives in graph_trainer_h100 suite (needs NVLink).
-        # TODO: Disabled due to upstream PyTorch nightly regression in
-        # dev20260508. TransformGetItemToIndex mode has no dispatch for
-        # torch.ops.higher_order.flex_attention, causing TypeError in
-        # gather_node_runtime_estimations during overlap scheduling.
-        # Re-enable once the upstream fix lands.
         OverrideDefinitions(
             [
                 [
@@ -215,7 +210,6 @@ def _build_llama3_tests() -> list[OverrideDefinitions]:
             "aot_fx_trace llama3 FSDP+TP+FlexAttn",
             "aot_fx_trace_llama3_fsdp_tp_flexattn",
             ngpu=8,
-            disabled=True,
         ),
         # TODO: Disabled due to upstream PyTorch cuDNN regression in nightly
         # dev20260506. _scaled_dot_product_cudnn_attention fails with
@@ -325,11 +319,6 @@ def _build_deepseek_v3_tests() -> list[OverrideDefinitions]:
             "aot_fx_trace_deepseek_v3_fsdp_tp_cp_ep",
             ngpu=8,
         ),
-        # TODO: Disabled due to upstream PyTorch nightly regression in
-        # dev20260508. TransformGetItemToIndex mode has no dispatch for
-        # torch.ops.higher_order.flex_attention, causing TypeError in
-        # gather_node_runtime_estimations during overlap scheduling.
-        # Re-enable once the upstream fix lands.
         OverrideDefinitions(
             [
                 [
@@ -344,7 +333,6 @@ def _build_deepseek_v3_tests() -> list[OverrideDefinitions]:
             "aot_fx_trace deepseek_v3 FSDP+TP+EP+FlexAttn",
             "aot_fx_trace_deepseek_v3_fsdp_tp_ep_flexattn",
             ngpu=8,
-            disabled=True,
         ),
         OverrideDefinitions(
             [
@@ -457,9 +445,6 @@ def _build_async_tp_tests() -> list[OverrideDefinitions]:
 def _build_autoparallel_tests() -> list[OverrideDefinitions]:
     """AutoParallel integration tests for default runners."""
     return [
-        # TODO: Disabled due to upstream AutoParallel regression in PyTorch
-        # nightly dev20260508. AutoParallel rejects FakeTensor device
-        # mismatch (traced on meta vs actual cuda). Re-enable once fixed.
         OverrideDefinitions(
             [
                 [
@@ -474,7 +459,6 @@ def _build_autoparallel_tests() -> list[OverrideDefinitions]:
             "autoparallel llama3 FSDP+TP",
             "autoparallel_llama3_fsdp_tp",
             ngpu=4,
-            disabled=True,
         ),
     ]
 
@@ -482,9 +466,6 @@ def _build_autoparallel_tests() -> list[OverrideDefinitions]:
 def _build_autoparallel_h100_tests() -> list[OverrideDefinitions]:
     """AutoParallel integration tests that require H100 runners."""
     return [
-        # TODO: Disabled due to upstream AutoParallel regression in PyTorch
-        # nightly dev20260508. AutoParallel rejects FakeTensor device
-        # mismatch (traced on meta vs actual cuda). Re-enable once fixed.
         OverrideDefinitions(
             [
                 [
@@ -500,7 +481,6 @@ def _build_autoparallel_h100_tests() -> list[OverrideDefinitions]:
             "autoparallel deepseek_v3 EFSDP+EP",
             "autoparallel_deepseek_v3_efsdp_ep",
             ngpu=4,
-            disabled=True,
         ),
     ]
 
