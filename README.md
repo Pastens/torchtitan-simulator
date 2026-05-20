@@ -151,6 +151,15 @@ Llama 3 8B model locally on 8 GPUs
 MODULE=llama3 CONFIG=llama3_8b ./run_train.sh
 ```
 
+### Start a simulation run (side-loaded experiment)
+
+Use the standard TorchTitan entrypoint and side-load the simulation trainer via
+experiment module/config:
+
+```bash
+MODULE=simulator.llama3 CONFIG=llama3_sim_debugmodel ./run_train.sh
+```
+
 ### Multi-Node Training
 For training on ParallelCluster/Slurm type configurations, you can use the `multinode_trainer.slurm` file to submit your sbatch job.
 
