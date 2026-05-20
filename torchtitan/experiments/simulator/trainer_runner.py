@@ -23,6 +23,7 @@ from .export import (
     export_json,
     export_text_summary,
 )
+from .extension_hooks import collect_extension_metadata, postprocess_extension_result
 from .fx_capture import capture_forward_fx, capture_joint_fx
 from .pp_schedule_extractor import PPScheduleExtractor
 from .runtime_capture import RuntimeCapture
@@ -107,6 +108,7 @@ def run_trainer_simulation(trainer: Any, sim_opts: Any) -> None:
         metadata={
             "mode": "simulation",
             "rank": rank,
+            **collect_extension_metadata(trainer, capture),
         }
     )
 
@@ -144,6 +146,8 @@ def run_trainer_simulation(trainer: Any, sim_opts: Any) -> None:
             ).to_dict()
         except Exception as exc:
             result.metadata["fx_joint_graph_error"] = str(exc)
+
+    result = postprocess_extension_result(result, trainer, sim_opts)
 
     output_formats = sim_opts.output_formats or [
         "json",

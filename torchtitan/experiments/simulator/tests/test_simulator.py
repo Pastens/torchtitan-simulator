@@ -504,6 +504,53 @@ class TestExport(unittest.TestCase):
             assert "PP rank" in content
 
 
+class TestTrainerRunnerExtensionHooks(unittest.TestCase):
+    def test_collect_extension_metadata(self):
+        from torchtitan.experiments.simulator.extension_hooks import (
+            collect_extension_metadata,
+        )
+
+        class TrainerWithMetadata:
+            def collect_simulation_metadata(self, capture):
+                assert capture == "capture"
+                return {"extension": {"enabled": True}}
+
+        assert collect_extension_metadata(TrainerWithMetadata(), "capture") == {
+            "extension": {"enabled": True}
+        }
+        assert collect_extension_metadata(object(), "capture") == {}
+
+    def test_collect_extension_metadata_rejects_non_dict(self):
+        from torchtitan.experiments.simulator.extension_hooks import (
+            collect_extension_metadata,
+        )
+
+        class BadTrainer:
+            def collect_simulation_metadata(self, capture):
+                del capture
+                return ["not", "metadata"]
+
+        with self.assertRaises(TypeError):
+            collect_extension_metadata(BadTrainer(), object())
+
+    def test_postprocess_extension_result(self):
+        from torchtitan.experiments.simulator.extension_hooks import (
+            postprocess_extension_result,
+        )
+
+        class TrainerWithPostprocess:
+            def postprocess_simulation_result(self, result, sim_opts):
+                result["sim_opts"] = sim_opts
+                return None
+
+        result = {"ok": True}
+        returned = postprocess_extension_result(
+            result, TrainerWithPostprocess(), "opts"
+        )
+        assert returned is result
+        assert result["sim_opts"] == "opts"
+
+
 # ===========================================================================
 # PP schedule extractor tests (mock schedule)
 # ===========================================================================

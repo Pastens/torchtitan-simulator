@@ -165,6 +165,24 @@ Simulation writes `simulation_result.json`, `compute_graph.dot`, `trace.json`,
 and provides expandable train-step sections, schedule swimlanes, and
 forward/backward/optimizer operator dependency DAGs.
 
+### Start a TorchTitan-NPU simulation run
+
+The NPU fork under `torchtitan-npu-simulator/` can side-load its simulation
+trainer through the native `torchtitan_npu.entry` path:
+
+```bash
+cd torchtitan-npu-simulator
+TRAIN_FILE=torchtitan_npu.entry \
+MODULE=torchtitan_npu.simulator.llama3 \
+CONFIG=llama3_npu_sim_debugmodel \
+./scripts/run_train.sh --training.steps=1
+```
+
+The generated trace reuses the same output formats and additionally annotates
+NPU-specific optimization settings such as swap/virtual/Muon optimizer config,
+NPU memory ratio, profiling windows, custom context parallelism, MTP, EP/ETP,
+model converters, and compile settings.
+
 ### Multi-Node Training
 For training on ParallelCluster/Slurm type configurations, you can use the `multinode_trainer.slurm` file to submit your sbatch job.
 
