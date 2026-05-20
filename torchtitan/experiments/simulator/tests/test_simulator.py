@@ -482,6 +482,27 @@ class TestExport(unittest.TestCase):
         assert "Communication Events" in summary
         assert "Total ops" in summary
 
+    def test_export_html(self):
+        from torchtitan.experiments.simulator.export import export_html
+
+        result = self._make_result()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "trace.html")
+            export_html(result, path)
+            assert os.path.exists(path)
+            with open(path) as f:
+                content = f.read()
+            assert "TorchTitan Simulation Trace" in content
+            assert "operator dependency DAG" in content
+            assert "schedule swimlanes" in content
+            assert "canvas" in content
+            assert "drawSchedule" in content
+            assert "drawDag" in content
+            assert "Zoom in" in content
+            assert "rank-tabs" in content
+            assert "Global rank" in content
+            assert "PP rank" in content
+
 
 # ===========================================================================
 # PP schedule extractor tests (mock schedule)

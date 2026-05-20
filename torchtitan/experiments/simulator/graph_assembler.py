@@ -136,9 +136,9 @@ class GraphAssembler:
         ``op_type="comm_p2p"`` and annotated with metadata from the event
         dict (``group``, ``tag``, ``src_rank``, ``dst_rank``, etc.).
 
-        If a matching compute node with the same ``(phase, pp_stage,
-        microbatch_idx)`` already exists, a sequential edge is added from the
-        last node in that group to the comm node.
+        Communication nodes are linked to their recorded source compute nodes
+        only. Schedule ordering is represented separately in
+        :class:`TrainingSchedule`.
 
         Args:
             graph: The graph to mutate in-place.
@@ -149,13 +149,6 @@ class GraphAssembler:
         Returns:
             The same graph (mutated).
         """
-        last_by_phase: dict[str, str] = {}
-
-        # Build reverse index: find last node id per phase from existing graph
-        for n in graph.nodes.values():
-            key = n.phase or "unknown"
-            last_by_phase[key] = n.node_id
-
         for ev in comm_events:
             node_id = ev.get("event_id", f"comm_{len(graph.nodes)+1:07d}")
             op_name = ev.get("op", "collective_unknown")
@@ -203,16 +196,5 @@ class GraphAssembler:
                             edge_type="data",
                         )
                     )
-
-            prev_id = last_by_phase.get(phase)
-            if prev_id is not None and prev_id != node_id:
-                graph.add_edge(
-                    DataEdge(
-                        src_node_id=prev_id,
-                        dst_node_id=node_id,
-                        edge_type="control",
-                    )
-                )
-            last_by_phase[phase] = node_id
 
         return graph

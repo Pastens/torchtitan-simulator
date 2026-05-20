@@ -30,7 +30,13 @@ Quick start::
     export_json(result, "output/result.json")
 """
 
-from .export import export_chrome_trace, export_dot, export_json, export_text_summary
+from .export import (
+    export_chrome_trace,
+    export_dot,
+    export_html,
+    export_json,
+    export_text_summary,
+)
 from .nodes import (
     ComputeGraph,
     DataEdge,
@@ -59,5 +65,6 @@ __all__ = [
     "export_json",
     "export_dot",
     "export_chrome_trace",
+    "export_html",
     "export_text_summary",
 ]

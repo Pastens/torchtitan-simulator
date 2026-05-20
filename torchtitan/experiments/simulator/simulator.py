@@ -40,7 +40,13 @@ import torch.nn as nn
 
 from .comm_interceptor import CommRecorder, capture_comms
 from .cpu_env import cpu_distributed_context, patch_device_type_to_cpu
-from .export import export_chrome_trace, export_dot, export_json, export_text_summary
+from .export import (
+    export_chrome_trace,
+    export_dot,
+    export_html,
+    export_json,
+    export_text_summary,
+)
 from .fx_capture import capture_forward_fx, capture_joint_fx
 from .nodes import SimulationResult, TrainingSchedule
 from .pp_schedule_extractor import PPScheduleExtractor
@@ -312,7 +318,7 @@ class Simulator:
             and schedule if applicable).
         """
         if output_formats is None:
-            output_formats = ["json", "dot", "chrome_trace", "text"]
+            output_formats = ["json", "dot", "chrome_trace", "html", "text"]
 
         # 1. Static FX capture
         self._log("=== Phase 1: Static FX capture ===")
@@ -362,6 +368,11 @@ class Simulator:
             p = os.path.join(output_dir, "trace.json")
             export_chrome_trace(rt_result, p)
             self._log(f"  Chrome trace → {p}")
+
+        if "html" in output_formats:
+            p = os.path.join(output_dir, "trace.html")
+            export_html(rt_result, p)
+            self._log(f"  HTML trace → {p}")
 
         if "text" in output_formats:
             summary = export_text_summary(rt_result)

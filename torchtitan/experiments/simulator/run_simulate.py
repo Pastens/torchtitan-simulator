@@ -73,8 +73,8 @@ def _parse_simulate_args() -> argparse.Namespace:
     parser.add_argument(
         "--simulate.output_format",
         dest="simulate_output_format",
-        default="json,dot,chrome_trace,text",
-        help="Comma-separated list of output formats (default: json,dot,chrome_trace,text)",
+        default="json,dot,chrome_trace,html,text",
+        help="Comma-separated list of output formats (default: json,dot,chrome_trace,html,text)",
     )
     parser.add_argument(
         "--simulate.max_seq_len",
@@ -199,6 +199,7 @@ def _export_result(result: Any, output_dir: str, output_formats: list[str], sim:
     from torchtitan.experiments.simulator.export import (
         export_chrome_trace,
         export_dot,
+        export_html,
         export_json,
         export_text_summary,
     )
@@ -216,6 +217,10 @@ def _export_result(result: Any, output_dir: str, output_formats: list[str], sim:
         p = os.path.join(output_dir, "trace.json")
         export_chrome_trace(result, p)
         sim._log(f"Chrome trace → {p}")
+    if "html" in output_formats:
+        p = os.path.join(output_dir, "trace.html")
+        export_html(result, p)
+        sim._log(f"HTML trace → {p}")
     if "text" in output_formats:
         summary = export_text_summary(result)
         p = os.path.join(output_dir, "summary.txt")

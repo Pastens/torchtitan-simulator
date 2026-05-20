@@ -16,7 +16,13 @@ from torchtitan.components.loss import IGNORE_INDEX
 from torchtitan.distributed import utils as dist_utils
 from torchtitan.tools.logging import logger
 
-from .export import export_chrome_trace, export_dot, export_json, export_text_summary
+from .export import (
+    export_chrome_trace,
+    export_dot,
+    export_html,
+    export_json,
+    export_text_summary,
+)
 from .fx_capture import capture_forward_fx, capture_joint_fx
 from .pp_schedule_extractor import PPScheduleExtractor
 from .runtime_capture import RuntimeCapture
@@ -31,6 +37,8 @@ def _export_result(result: Any, output_dir: str, output_formats: list[str]) -> N
         export_dot(result.compute_graph, os.path.join(output_dir, "compute_graph.dot"))
     if "chrome_trace" in output_formats:
         export_chrome_trace(result, os.path.join(output_dir, "trace.json"))
+    if "html" in output_formats:
+        export_html(result, os.path.join(output_dir, "trace.html"))
     if "text" in output_formats:
         with open(os.path.join(output_dir, "summary.txt"), "w", encoding="utf-8") as f:
             f.write(export_text_summary(result))
@@ -137,6 +145,12 @@ def run_trainer_simulation(trainer: Any, sim_opts: Any) -> None:
         except Exception as exc:
             result.metadata["fx_joint_graph_error"] = str(exc)
 
-    output_formats = sim_opts.output_formats or ["json", "dot", "chrome_trace", "text"]
+    output_formats = sim_opts.output_formats or [
+        "json",
+        "dot",
+        "chrome_trace",
+        "html",
+        "text",
+    ]
     _export_result(result, sim_opts.output_dir, output_formats)
     logger.info("Simulation outputs written to %s", sim_opts.output_dir)

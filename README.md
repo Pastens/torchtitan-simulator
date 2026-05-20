@@ -160,6 +160,11 @@ experiment module/config:
 MODULE=simulator.llama3 CONFIG=llama3_sim_debugmodel ./run_train.sh
 ```
 
+Simulation writes `simulation_result.json`, `compute_graph.dot`, `trace.json`,
+`trace.html`, and `summary.txt` by default. The HTML trace is self-contained
+and provides expandable train-step sections, schedule swimlanes, and
+forward/backward/optimizer operator dependency DAGs.
+
 ### Multi-Node Training
 For training on ParallelCluster/Slurm type configurations, you can use the `multinode_trainer.slurm` file to submit your sbatch job.
 

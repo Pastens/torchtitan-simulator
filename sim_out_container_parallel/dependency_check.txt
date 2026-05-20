@@ -1,0 +1,2 @@
+OK: schedule deps are acyclic and logical clocks are monotonic.
+OK: compute graph data deps are acyclic and have valid endpoints.

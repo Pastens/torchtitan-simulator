@@ -9,9 +9,9 @@ from torchtitan.components.loss import ChunkedCELoss
 from torchtitan.components.metrics import MetricsProcessor
 from torchtitan.components.optimizer import OptimizersContainer
 from torchtitan.config import ActivationCheckpointConfig, ParallelismConfig, TrainingConfig
-from torchtitan.hf_datasets.text_datasets import HuggingFaceTextDataLoader
 from torchtitan.models.llama3.config_registry import model_registry
 
+from ..synthetic_dataloader import SyntheticTokenDataLoader
 from ..trainer import SimulationConfig, SimulationTrainer
 
 
@@ -26,12 +26,13 @@ def llama3_sim_debugmodel() -> SimulationTrainer.Config:
         model_spec=model_registry("debugmodel"),
         optimizer=OptimizersContainer.Config(lr=8e-4),
         training=TrainingConfig(
-            local_batch_size=4,
-            seq_len=512,
+            local_batch_size=1,
+            seq_len=64,
             steps=1,
         ),
-        dataloader=HuggingFaceTextDataLoader.Config(
-            dataset="c4_test",
+        dataloader=SyntheticTokenDataLoader.Config(
+            vocab_size=2048,
+            seed=42,
         ),
         metrics=MetricsProcessor.Config(log_freq=1),
         parallelism=ParallelismConfig(
@@ -47,7 +48,7 @@ def llama3_sim_debugmodel() -> SimulationTrainer.Config:
         ),
         simulation=SimulationConfig(
             output_dir="./simulator_output",
-            output_formats=["json", "dot", "chrome_trace", "text"],
+            output_formats=["json", "dot", "chrome_trace", "html", "text"],
             capture_joint_fx=False,
         ),
     )

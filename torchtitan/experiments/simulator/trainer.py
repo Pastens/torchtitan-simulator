@@ -18,7 +18,7 @@ from .trainer_runner import run_trainer_simulation
 class SimulationConfig:
     output_dir: str = "./simulator_output"
     output_formats: list[str] = field(
-        default_factory=lambda: ["json", "dot", "chrome_trace", "text"]
+        default_factory=lambda: ["json", "dot", "chrome_trace", "html", "text"]
     )
     capture_joint_fx: bool = False
 
@@ -27,6 +27,10 @@ class SimulationTrainer(Trainer):
     @dataclass(kw_only=True, slots=True)
     class Config(Trainer.Config):
         simulation: SimulationConfig = field(default_factory=SimulationConfig)
+
+    def __init__(self, config: Config):
+        patch_device_type_to_cpu()
+        super().__init__(config)
 
     def train(self):
         patch_device_type_to_cpu()
