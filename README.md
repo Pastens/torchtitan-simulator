@@ -183,6 +183,9 @@ NPU-specific optimization settings such as swap/virtual/Muon optimizer config,
 NPU memory ratio, profiling windows, custom context parallelism, MTP, EP/ETP,
 model converters, and compile settings.
 
+Architecture details are documented in `docs/simulator_architecture.md` and
+`torchtitan-npu-simulator/docs/simulation_architecture.md`.
+
 ### Multi-Node Training
 For training on ParallelCluster/Slurm type configurations, you can use the `multinode_trainer.slurm` file to submit your sbatch job.
 
