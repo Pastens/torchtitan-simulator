@@ -30,11 +30,7 @@ from .comm_interceptor import CommRecorder, capture_comms
 from .dispatch_interceptor import OpRecorder, capture_ops
 from .fsdp_tracer import FSDPEventRecorder, capture_fsdp_events
 from .graph_assembler import GraphAssembler
-from .memory_estimator import (
-    estimate_comm_memory,
-    estimate_graph_memory,
-    merge_memory_summary,
-)
+from .memory_estimator import build_runtime_memory
 from .nodes import (
     ScheduleDep,
     ScheduleEvent,
@@ -327,25 +323,13 @@ class RuntimeCapture:
         for dep in self._pp_deps:
             schedule.add_dep(ScheduleDep(dep["from"], dep["to"], dep["type"]))
 
-        graph_memory_events, graph_memory_summary = estimate_graph_memory(graph)
-        comm_memory_events = estimate_comm_memory(self.comm_recorder.events)
-        comm_memory_summary = {
-            **merge_memory_summary(
-                graph_memory_summary,
-                {
-                    "total_event_bytes": sum(e.bytes for e in comm_memory_events),
-                    "by_category": {
-                        "comm_event_buffer": sum(e.bytes for e in comm_memory_events)
-                    },
-                },
-            ),
-            "graph_peak_live_bytes": graph_memory_summary.get("peak_live_bytes", 0),
-        }
         metadata = metadata or {}
-        metadata["memory"] = merge_memory_summary(
-            metadata.get("memory", {}),
-            comm_memory_summary,
+        memory_events, memory_summary = build_runtime_memory(
+            graph,
+            self.comm_recorder.events,
+            existing_metadata=metadata.get("memory"),
         )
+        metadata["memory"] = memory_summary
 
         return SimulationResult(
             compute_graph=graph,
@@ -353,6 +337,6 @@ class RuntimeCapture:
             comm_events=list(self.comm_recorder.events),
             fsdp_events=list(self.fsdp_recorder.events),
             pp_events=list(self._pp_events),
-            memory_events=[*graph_memory_events, *comm_memory_events],
+            memory_events=memory_events,
             metadata=metadata,
         )

@@ -13,6 +13,7 @@ from typing import Any
 from .nodes import ComputeGraph, MemoryEvent, TensorMeta
 
 
+
 _DTYPE_SIZES: dict[str, int] = {
     "torch.bool": 1,
     "torch.uint8": 1,
@@ -70,6 +71,75 @@ def _event_counter(prefix: str):
         return f"{prefix}_{count:07d}"
 
     return next_id
+
+
+AGGREGATE_MEMORY_KEYS = {"total_event_bytes", "by_category", "by_phase", "by_device"}
+
+
+def memory_metadata_without_aggregates(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    if not metadata:
+        return {}
+    return {key: value for key, value in metadata.items() if key not in AGGREGATE_MEMORY_KEYS}
+
+
+def finalize_memory_summary(
+    events: list[MemoryEvent],
+    *summaries: dict[str, Any],
+    existing_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    merged = merge_memory_summary(
+        summarize_memory_events(events),
+        memory_metadata_without_aggregates(existing_metadata),
+        *summaries,
+    )
+    return merged
+
+
+def build_runtime_memory(
+    graph: ComputeGraph,
+    comm_events: list[dict[str, Any]],
+    *,
+    existing_metadata: dict[str, Any] | None = None,
+) -> tuple[list[MemoryEvent], dict[str, Any]]:
+    graph_memory_events, graph_memory_summary = estimate_graph_memory(graph)
+    comm_memory_events = estimate_comm_memory(comm_events)
+    comm_memory_summary = merge_memory_summary(
+        graph_memory_summary,
+        {
+            "total_event_bytes": sum(e.bytes for e in comm_memory_events),
+            "by_category": {
+                "comm_event_buffer": sum(e.bytes for e in comm_memory_events)
+            },
+        },
+    )
+    comm_memory_summary["graph_peak_live_bytes"] = graph_memory_summary.get(
+        "peak_live_bytes", 0
+    )
+    memory_summary = finalize_memory_summary(
+        [*graph_memory_events, *comm_memory_events],
+        comm_memory_summary,
+        existing_metadata=existing_metadata,
+    )
+    return [*graph_memory_events, *comm_memory_events], memory_summary
+
+
+def attach_model_state_memory(
+    result: Any,
+    model_parts: list[Any],
+    *,
+    optimizer_name: str | None = None,
+) -> dict[str, Any]:
+    model_memory_events, model_memory_summary = estimate_model_state_memory(
+        model_parts,
+        optimizer_name=optimizer_name,
+    )
+    result.memory_events.extend(model_memory_events)
+    result.metadata["memory"] = finalize_memory_summary(
+        result.memory_events,
+        model_memory_summary,
+        existing_metadata=result.metadata.get("memory"),
+    )
+    return model_memory_summary
 
 
 def estimate_graph_memory(graph: ComputeGraph) -> tuple[list[MemoryEvent], dict[str, Any]]:
